@@ -20,7 +20,7 @@ app.use(cookieParser());
 // serve all the static files from uploads directry
 app.use('/uploads', express.static(__dirname + '/uploads'));
 
-mongoose.connect('mongodb+srv://chitranxshi:XQwBjT5tKHDE4LSQ@cluster0.sxxidoq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
+mongoose.connect('mongodb+srv://chitranxshi:lNzZHO3ocuBWQCW7@cluster0.h5w2oja.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
 
 app.post('/register', async (req, res) => {
     const {username, password} = req.body;
@@ -75,30 +75,33 @@ app.post('/logout', (req, res) => {
 
 // to grab the file (image), we'll need the library - multer
 app.post('/post', uploadMiddleware.single('postImage'), async (req, res) => {
-    //extract the image file extension
-    const {originalname, path} = req.file;
-    const parts = originalname.split('.');
-    const ext = parts[parts.length - 1];
-
-    // to rename the file, we need the fs library
-    // this is how we get the filename with the extension in our uploads
-    const newPath = path + '.' + ext;
-    fs.renameSync(path, newPath);
+    let newPath = null;
+    if (req.file) {
+        const {originalname, path} = req.file;
+        const parts = originalname.split('.');
+        const ext = parts[parts.length - 1];
+        newPath = path + '.' + ext;
+        fs.renameSync(path, newPath);
+    }
 
     const {token} = req.cookies;
     jwt.verify(token, secret, {}, async (err, info) => {
         if (err) throw err;
         // saving everything from the payload to our database
-        const {title, summary, content} = req.body;
-        const postDoc = await Post.create({
-            title,
-            summary,
-            content,
-            cover: newPath,
-            author: info.id,
-        });
-        // res.json(info);
-        res.json(postDoc);
+        const {title, originalWriter, content} = req.body;
+        try {
+            const postDoc = await Post.create({
+                title,
+                originalWriter,
+                content,
+                cover: newPath,
+                author: info.id,
+            });
+            res.json(postDoc);
+        } catch (error) {
+            console.error("Error creating post:", error);
+            res.status(500).json({ error: 'Error creating post' });
+        }
     });
 });
 
@@ -129,8 +132,8 @@ app.put('/post', uploadMiddleware.single('postImage'), async (req, res) => {
             };
             console.log("JWT verified successfully. User info:", info);
 
-            const {id, title, summary, content} = req.body;
-            console.log("Post details:", {id, title, summary, content});
+            const {id, title, originalWriter, content} = req.body;
+            console.log("Post details:", {id, title, originalWriter, content});
 
             try {
                 const postDoc = await Post.findById(id);
@@ -150,7 +153,7 @@ app.put('/post', uploadMiddleware.single('postImage'), async (req, res) => {
     
                 const updateResult = await Post.updateOne({_id: id}, {
                     title,
-                    summary,
+                    originalWriter,
                     content,
                     cover: newPath ? newPath : postDoc.cover,
                 });
@@ -169,20 +172,6 @@ app.put('/post', uploadMiddleware.single('postImage'), async (req, res) => {
     }
 });
 
-
-// app.put('/post', async (req, res) => {
-//     console.log('Received PUT request to /post');
-//     console.log('Request body:', req.body);
-//     try {
-//       // Respond with a simple message
-//       res.json({ message: 'Received update request' });
-//     } catch (error) {
-//       console.error('Error in /post route:', error);
-//       res.status(500).json({ error: 'Internal server error' });
-//     }
-//   });
-
-
 app.get('/posts', async (req, res) => {
     res.json(
         await Post.find()
@@ -196,6 +185,33 @@ app.get('/post/:id', async (req, res) => {
     const {id} = req.params;
     const postDoc = await Post.findById(id).populate('author', ['username']);  // only send userna,e from author, no password
     res.json(postDoc);
+});
+
+app.delete('/post/:id', async (req, res) => {
+    const {id} = req.params;
+    const {token} = req.cookies;
+
+    jwt.verify(token, secret, {}, async (err, info) => {
+        if (err) throw err;
+        try{
+            const postDoc = await Post.findById(id);
+            if(!postDoc) {
+                return res.status(404).json('Post not found');
+            }
+
+            const isAuthor = JSON.stringify(postDoc.author) === JSON.stringify(info.id);
+            if(!isAuthor) {
+                return res.status(403).json('You are not the author of this post.')
+            }
+
+            await Post.findByIdAndDelete(id);
+            res.json('Post deleted successfully');
+       
+        } catch(error) {
+            console.log("Error deleting post: ", error);
+            res.status(500).json({error: 'Error deleting post'});
+        }
+    })
 });
 
 

@@ -3,9 +3,9 @@ const {Schema, model} = mongoose;
 
 const PostSchema = new Schema({
     title: String,
-    summary: String,
-    content: String,
-    cover: String,
+    originalWriter: {type: String, required: false},
+    content: {type: String, required: false},
+    cover: {type: String, required: false},
     author: {type: Schema.Types.ObjectId, ref: 'User'},
 }, {
     timestamps: true,
