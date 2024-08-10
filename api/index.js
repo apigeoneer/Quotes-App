@@ -20,7 +20,7 @@ app.use(cookieParser());
 // serve all the static files from uploads directry
 app.use('/uploads', express.static(__dirname + '/uploads'));
 
-mongoose.connect('mongodb+srv://chitranxshi:lNzZHO3ocuBWQCW7@cluster0.h5w2oja.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
+mongoose.connect('mongodb+srv://chitranxshi:<password>@cluster0.h5w2oja.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
 
 app.post('/register', async (req, res) => {
     const {username, password} = req.body;
